@@ -2,15 +2,23 @@ package main
 
 import "fmt"
 
-const englishHelloPrefix = "Hello, "
+const (
+	englishPrefix = "Hello, "
+	spanishPrefix = "Hola, "
+	spanish       = "Spanish"
+)
 
-func Hello(name string) string {
+func Hello(name, language string) string {
 	if name == "" {
-		return englishHelloPrefix + "World"
+		return englishPrefix + "World"
 	}
-	return englishHelloPrefix + name
+
+	if language == spanish {
+		return spanishPrefix + name
+	}
+	return englishPrefix + name
 }
 
 func main() {
-	fmt.Println(Hello("world"))
+	fmt.Println(Hello("world", ""))
 }
