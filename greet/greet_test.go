@@ -2,7 +2,6 @@ package greet
 
 import (
 	"bytes"
-	"os"
 	"testing"
 )
 
@@ -11,13 +10,10 @@ func TestGreet(t *testing.T) {
 
 	Greet(&buffer, "Chris")
 	got := buffer.String()
-	want := "Hello, Chris"
+	want := "Hello, Chris \n"
 
 	if got != want {
 		t.Errorf("got %q want %q", got, want)
 	}
 }
 
-func TestGreetStdou(t *testing.T) {
-	Greet(os.Stdout, "Santiago")
-}
