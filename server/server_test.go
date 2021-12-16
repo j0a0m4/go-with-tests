@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	assert "github.com/matryer/is"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,11 @@ import (
 type StubPlayerStore struct {
 	scores   map[string]int
 	winCalls []string
+	league   []Player
+}
+
+func (s *StubPlayerStore) GetLeague() []Player {
+	return s.league
 }
 
 func (s *StubPlayerStore) GetPlayerScore(name string) int {
@@ -25,7 +31,7 @@ func TestGETPlayers(t *testing.T) {
 		"Pepper": 20,
 		"Floyd":  10,
 	}}
-	server := PlayerServer{Store: &store}
+	server := NewPlayerServer(&store)
 
 	t.Run("returns Pepper's score", func(t *testing.T) {
 		req, _ := newGetScoreRequest("Pepper")
@@ -76,7 +82,7 @@ func TestGETPlayers(t *testing.T) {
 
 func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 	store := InMemoryPlayerStore{map[string]int{}}
-	server := PlayerServer{Store: &store}
+	server := NewPlayerServer(&store)
 	player := "Pepper"
 
 	for i := 0; i < 3; i++ {
@@ -84,14 +90,66 @@ func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 		server.ServeHTTP(httptest.NewRecorder(), req)
 	}
 
-	res := httptest.NewRecorder()
-	req, _ := newGetScoreRequest(player)
+	t.Run("get score", func(t *testing.T) {
+		res := httptest.NewRecorder()
+		req, _ := newGetScoreRequest(player)
 
-	server.ServeHTTP(res, req)
+		server.ServeHTTP(res, req)
 
-	is := assert.New(t)
-	is.Equal(res.Code, http.StatusOK)
-	is.Equal(res.Body.String(), "3")
+		is := assert.New(t)
+		is.Equal(res.Code, http.StatusOK)
+		is.Equal(res.Body.String(), "3")
+	})
+
+	t.Run("get league", func(t *testing.T) {
+		res := httptest.NewRecorder()
+		req, _ := newLeagueRequest()
+
+		server.ServeHTTP(res, req)
+
+		want := []Player{{"Pepper", 3}}
+		var got []Player
+		err := json.NewDecoder(res.Body).Decode(&got)
+
+		is := assert.New(t)
+		is.Equal(res.Code, http.StatusOK)
+		is.Equal(res.Header().Get("content-type"), jsonContentType)
+		is.Equal(got, want)
+		is.NoErr(err)
+	})
+}
+
+func TestLeague(t *testing.T) {
+
+	t.Run("it returns the league table as JSON", func(t *testing.T) {
+		wanted := []Player{
+			{"Cleo", 32},
+			{"Christ", 20},
+			{"Tiest", 14},
+		}
+
+		store := StubPlayerStore{
+			scores:   nil,
+			winCalls: nil,
+			league:   wanted,
+		}
+		server := NewPlayerServer(&store)
+
+		req, _ := http.NewRequest(http.MethodGet, "/league", nil)
+		res := httptest.NewRecorder()
+
+		server.ServeHTTP(res, req)
+
+		var got []Player
+
+		err := json.NewDecoder(res.Body).Decode(&got)
+
+		is := assert.New(t)
+		is.NoErr(err)
+		is.Equal(res.Code, http.StatusOK)
+		is.Equal(got, wanted)
+		is.Equal(res.Header().Get("content-type"), jsonContentType)
+	})
 }
 
 func newPostWinRequest(name string) (*http.Request, error) {
@@ -100,4 +158,8 @@ func newPostWinRequest(name string) (*http.Request, error) {
 
 func newGetScoreRequest(name string) (*http.Request, error) {
 	return http.NewRequest(http.MethodGet, "/players/"+name, nil)
+}
+
+func newLeagueRequest() (*http.Request, error) {
+	return http.NewRequest(http.MethodGet, "/league", nil)
 }
